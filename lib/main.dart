@@ -1,47 +1,63 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:get/get.dart';
+import 'package:flutter/services.dart';
+import 'package:sizer/sizer.dart';
 
-import 'app/data/local/my_shared_pref.dart';
-import 'app/routes/app_pages.dart';
-import 'config/theme/my_theme.dart';
-import 'config/translations/localization_service.dart';
+import '../core/app_export.dart';
+import '../widgets/custom_error_widget.dart';
 
-Future<void> main() async {
-  // wait for bindings
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // init shared preference
-  await MySharedPref.init();
+  bool _hasShownError = false;
 
-  runApp(
-    ScreenUtilInit(
-      designSize: const Size(390, 844),
-      minTextAdapt: true,
-      splitScreenMode: true,
-      useInheritedMediaQuery: true,
-      rebuildFactor: (old, data) => true,
-      builder: (context, widget) {
-        return GetMaterialApp(
-          title: "Grocery App",
-          useInheritedMediaQuery: true,
-          debugShowCheckedModeBanner: false,
-          builder: (context,widget) {
-            bool themeIsLight = MySharedPref.getThemeIsLight();
-            return Theme(
-              data: MyTheme.getThemeData(isLight: themeIsLight),
-              child: MediaQuery(
-                data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
-                child: widget!,
-              ),
-            );
-          },
-          initialRoute: AppPages.INITIAL, // first screen to show when app is running
-          getPages: AppPages.routes, // app screens
-          locale: MySharedPref.getCurrentLocal(), // app language
-          translations: LocalizationService.getInstance(), // localization services in app (controller app language)
-        );
-      },
-    ),
-  );
+  // 🚨 CRITICAL: Custom error handling - DO NOT REMOVE
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    if (!_hasShownError) {
+      _hasShownError = true;
+
+      // Reset flag after 3 seconds to allow error widget on new screens
+      Future.delayed(Duration(seconds: 5), () {
+        _hasShownError = false;
+      });
+
+      return CustomErrorWidget(
+        errorDetails: details,
+      );
+    }
+    return SizedBox.shrink();
+  };
+
+  // 🚨 CRITICAL: Device orientation lock - DO NOT REMOVE
+  Future.wait([
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp])
+  ]).then((value) {
+    runApp(MyApp());
+  });
+}
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Sizer(builder: (context, orientation, screenType) {
+      return MaterialApp(
+        title: 'adhesivepro',
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeMode.light,
+        // 🚨 CRITICAL: NEVER REMOVE OR MODIFY
+        builder: (context, child) {
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: TextScaler.linear(1.0),
+            ),
+            child: child!,
+          );
+        },
+        // 🚨 END CRITICAL SECTION
+        debugShowCheckedModeBanner: false,
+        routes: AppRoutes.routes,
+        initialRoute: AppRoutes.initial,
+      );
+    });
+  }
 }
